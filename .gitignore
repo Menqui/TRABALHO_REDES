@@ -1,0 +1,6 @@
+# Exclui o ambiente virtual
+sdn_env/
+
+# Exclui arquivos temporários do Python
+__pycache__/
+*.pyc
