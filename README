@@ -1,0 +1,6 @@
+# Ativar o Ambiente Virtual
+-- source venv/bin/activate
+
+
+# Roda no Terminal 1
+-- osken-manager --ofp-tcp-listen-port 6633 ryu_controller.py
