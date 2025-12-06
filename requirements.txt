@@ -3,3 +3,5 @@ mininet
 iperf3
 eventlet==0.33.3
 oskenlib #substitui o ryu
+pandas
+matplotlib

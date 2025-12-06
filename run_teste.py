@@ -135,7 +135,6 @@ def run():
     controller.terminate()
 def gerar_notebook():
     import json
-    from pathlib import Path
 
     notebook = {
         "cells": [
@@ -143,7 +142,7 @@ def gerar_notebook():
                 "cell_type": "markdown",
                 "metadata": {},
                 "source": [
-                    "# Análise de Resultados – SDN\n",
+                    "# 📊 Análise de Resultados – SDN\n",
                     "Notebook gerado automaticamente pelo script."
                 ]
             },
@@ -156,20 +155,29 @@ def gerar_notebook():
                     "\n",
                     "lat = pd.read_csv('latencia.csv')\n",
                     "vaz = pd.read_csv('vazao.csv')\n",
-                    "lat, vaz"
+                    "\n",
+                    "# Criar coluna 'host_pair'\n",
+                    "lat['host_pair'] = lat['Origem'] + '-' + lat['Destino']\n",
+                    "vaz['host_pair'] = vaz['Origem'] + '-' + vaz['Destino']\n",
+                    "\n",
+                    "# Converter valores numéricos (N/A vira NaN)\n",
+                    "lat['Latência Média (ms)'] = pd.to_numeric(lat['Latência Média (ms)'], errors='coerce')\n",
+                    "vaz['Vazão TCP (Mbps)'] = pd.to_numeric(vaz['Vazão TCP (Mbps)'], errors='coerce')\n",
+                    "\n",
+                    "lat.head(), vaz.head()"
                 ]
             },
             {
                 "cell_type": "code",
                 "metadata": {},
                 "source": [
-                    "# Gráfico Latência\n",
+                    "# 📈 Gráfico de Latência\n",
                     "plt.figure()\n",
-                    "plt.plot(lat['host_pair'], lat['latencia_ms'])\n",
+                    "plt.plot(lat['host_pair'], lat['Latência Média (ms)'])\n",
                     "plt.xlabel('Par de Hosts')\n",
                     "plt.ylabel('Latência (ms)')\n",
                     "plt.title('Latência por Par de Hosts')\n",
-                    "plt.xticks(rotation=45)\n",
+                    "plt.xticks(rotation=90)\n",
                     "plt.tight_layout()\n",
                     "plt.show()"
                 ]
@@ -178,13 +186,13 @@ def gerar_notebook():
                 "cell_type": "code",
                 "metadata": {},
                 "source": [
-                    "# Gráfico Vazão\n",
+                    "# 📈 Gráfico de Vazão\n",
                     "plt.figure()\n",
-                    "plt.plot(vaz['host_pair'], vaz['vazao_Mbps'])\n",
+                    "plt.plot(vaz['host_pair'], vaz['Vazão TCP (Mbps)'])\n",
                     "plt.xlabel('Par de Hosts')\n",
-                    "plt.ylabel('Vazão (Mbps)')\n",
-                    "plt.title('Vazão por Par de Hosts')\n",
-                    "plt.xticks(rotation=45)\n",
+                    "plt.ylabel('Vazão TCP (Mbps)')\n",
+                    "plt.title('Vazão TCP por Par de Hosts')\n",
+                    "plt.xticks(rotation=90)\n",
                     "plt.tight_layout()\n",
                     "plt.show()"
                 ]
@@ -193,13 +201,13 @@ def gerar_notebook():
                 "cell_type": "code",
                 "metadata": {},
                 "source": [
-                    "# Comparação Latência x Vazão\n",
+                    "# 📉 Comparação Latência x Vazão\n",
                     "plt.figure()\n",
-                    "plt.plot(lat['host_pair'], lat['latencia_ms'], label='Latência (ms)')\n",
-                    "plt.plot(vaz['host_pair'], vaz['vazao_Mbps'], label='Vazão (Mbps)')\n",
+                    "plt.plot(lat['host_pair'], lat['Latência Média (ms)'], label='Latência (ms)')\n",
+                    "plt.plot(vaz['host_pair'], vaz['Vazão TCP (Mbps)'], label='Vazão TCP (Mbps)')\n",
                     "plt.legend()\n",
                     "plt.title('Comparativo Latência x Vazão')\n",
-                    "plt.xticks(rotation=45)\n",
+                    "plt.xticks(rotation=90)\n",
                     "plt.tight_layout()\n",
                     "plt.show()"
                 ]
@@ -224,7 +232,6 @@ def gerar_notebook():
         json.dump(notebook, f, indent=2)
 
     print("*** Notebook analise_resultados.ipynb criado com sucesso! ***")
-
 # ------------------------------------------------------------
 # Execução
 # ------------------------------------------------------------

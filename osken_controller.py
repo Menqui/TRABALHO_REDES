@@ -1,141 +1,87 @@
-#!/usr/bin/env python3
-import subprocess
-import time
-import csv
-from mininet.net import Mininet
-from mininet.node import RemoteController
-from mininet.log import setLogLevel, info
-from mininet.topolib import TreeTopo
-from mininet.link import TCLink
-from mininet.cli import CLI
-from rnp_topo import RNPTopo
+from os_ken.base import app_manager
+from os_ken.controller import ofp_event
+from os_ken.controller.handler import MAIN_DISPATCHER, CONFIG_DISPATCHER, set_ev_cls
+from os_ken.ofproto import ofproto_v1_3
+from os_ken.lib.packet import packet, ethernet
 
 
-# CONFIGURAÇÕES DO CONTROLADOR OS-KEN
-RYU_PORT = 6633
-CONTROLLER_FILE = "osken_controller.py"  # <-- SEU CONTROLADOR AQUI
-RYU_CMD = f"osken-manager --ofp-tcp-listen-port {RYU_PORT} {CONTROLLER_FILE}"
+class SimpleSwitch13(app_manager.OSKenApp):
+    OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
 
+    def __init__(self, *args, **kwargs):
+        super(SimpleSwitch13, self).__init__(*args, **kwargs)
+        self.mac_to_port = {}
 
-# ------------------------------------------------------------
-# Função para rodar testes de latência (ping)
-# ------------------------------------------------------------
-def test_latency(net):
-    results = []
-    hosts = net.hosts
+    @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
+    def switch_features_handler(self, ev):
+        datapath = ev.msg.datapath
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
 
-    info("\n=== Teste de Latência (Ping) ===\n")
+        # Regra default = PACKET_IN ao controller
+        match = parser.OFPMatch()
+        actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
+                                          ofproto.OFPCML_NO_BUFFER)]
+        self.add_flow(datapath, 0, match, actions)
 
-    for src in hosts:
-        for dst in hosts:
-            if src != dst:
-                result = src.cmd(f"ping -c 4 {dst.IP()}")
+    def add_flow(self, datapath, priority, match, actions):
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
 
-                # Extrair latência média
-                try:
-                    last_line = result.split("\n")[-2]
-                    avg_latency = last_line.split("/")[4]
-                except Exception:
-                    avg_latency = "N/A"
+        inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,
+                                             actions)]
+        mod = parser.OFPFlowMod(
+            datapath=datapath, priority=priority,
+            match=match, instructions=inst)
+        datapath.send_msg(mod)
 
-                results.append([src.name, dst.name, avg_latency])
-                info(f"{src.name} -> {dst.name}: {avg_latency} ms\n")
+    @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
+    def packet_in_handler(self, ev):
+        msg = ev.msg
+        datapath = msg.datapath
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+        in_port = msg.match['in_port']
 
-    return results
+        # Decodifica pacote corretamente
+        pkt = packet.Packet(msg.data)
+        eth = pkt.get_protocol(ethernet.ethernet)
 
+        if eth is None:
+            return
 
-# ------------------------------------------------------------
-# Função para medir vazão com iperf3
-# ------------------------------------------------------------
-def test_throughput(net):
-    results = []
-    hosts = net.hosts
+        dst = eth.dst
+        src = eth.src
 
-    info("\n=== Teste de Vazão (iperf3) ===\n")
+        dpid = datapath.id
+        self.mac_to_port.setdefault(dpid, {})
 
-    for i in range(len(hosts)):
-        for j in range(len(hosts)):
-            if i != j:
-                src = hosts[i]
-                dst = hosts[j]
+        # Aprende MAC
+        self.mac_to_port[dpid][src] = in_port
 
-                # Iniciar servidor TCP
-                dst.cmd("iperf3 -s -D")  # Daemon
+        # Escolhe porta de saída
+        if dst in self.mac_to_port[dpid]:
+            out_port = self.mac_to_port[dpid][dst]
+        else:
+            out_port = ofproto.OFPP_FLOOD
 
-                # Cliente envia tráfego por 5 segundos
-                output = src.cmd(f"iperf3 -c {dst.IP()} -J -t 5")
+        actions = [parser.OFPActionOutput(out_port)]
 
-                # Extrair vazão
-                try:
-                    import json
-                    data = json.loads(output)
-                    bitrate = data["end"]["sum_received"]["bits_per_second"] / 1e6
-                    bitrate = round(bitrate, 2)
-                except Exception:
-                    bitrate = "N/A"
+        # Instala fluxo se souber destino
+        if out_port != ofproto.OFPP_FLOOD:
+            match = parser.OFPMatch(
+                in_port=in_port,
+                eth_src=src,
+                eth_dst=dst
+            )
+            self.add_flow(datapath, 1, match, actions)
 
-                results.append([src.name, dst.name, bitrate])
-                info(f"{src.name} -> {dst.name}: {bitrate} Mbps\n")
-
-                dst.cmd("killall iperf3")
-
-    return results
-
-
-# ------------------------------------------------------------
-# Função principal
-# ------------------------------------------------------------
-def run():
-    setLogLevel('info')
-
-    info("\n=== Iniciando controlador OS-Ken ===\n")
-    controller = subprocess.Popen(RYU_CMD.split(),
-                                  stdout=subprocess.PIPE,
-                                  stderr=subprocess.PIPE)
-
-    time.sleep(2)  # Tempo para o controlador subir
-
-    info("\n=== Criando topologia RNP no Mininet ===\n")
-    topo = RNPTopo()
-    net = Mininet(topo=topo,
-                  controller=None,
-                  autoSetMacs=True,
-                  link=TCLink)
-
-    net.addController("c0", controller=RemoteController,
-                      ip="127.0.0.1", port=RYU_PORT)
-
-    net.start()
-
-    info("\n=== Aquecendo a rede com pingAll ===\n")
-    net.pingAll()
-
-    # ---- Testes ----
-    latency_results = test_latency(net)
-    throughput_results = test_throughput(net)
-
-    # ---- Salvando CSV ----
-    info("\n=== Salvando resultados ===\n")
-
-    with open("latencia.csv", "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["Origem", "Destino", "Latência Média (ms)"])
-        writer.writerows(latency_results)
-
-    with open("vazao.csv", "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["Origem", "Destino", "Vazão TCP (Mbps)"])
-        writer.writerows(throughput_results)
-
-    info("\nArquivos gerados: latencia.csv, vazao.csv\n")
-
-    CLI(net)
-    net.stop()
-    controller.terminate()
-
-
-# ------------------------------------------------------------
-# Execução
-# ------------------------------------------------------------
-if __name__ == "__main__":
-    run()
+        # Envia pacote
+        out = parser.OFPPacketOut(
+            datapath=datapath,
+            buffer_id=msg.buffer_id,
+            in_port=in_port,
+            actions=actions,
+            data=msg.data
+        )
+        datapath.send_msg(out)
