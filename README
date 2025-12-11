@@ -1,6 +1,11 @@
 # Ativar o Ambiente Virtual
 -- source venv/bin/activate
 
+# Rodar antes de qualquer operação, limpeza de ambiente da mininet
+-- sudo mn -c
 
 # Roda no Terminal 1
--- osken-manager --ofp-tcp-listen-port 6633 ryu_controller.py
+-- osken-manager --ofp-tcp-listen-port 6633 osken_controller.py
+
+# Roda no terminal 2
+-- sudo python3 run_teste.py
