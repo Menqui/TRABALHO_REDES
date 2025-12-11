@@ -18,7 +18,7 @@ class SimpleSwitch13(app_manager.OSKenApp):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
-        # Regra default = PACKET_IN ao controller
+        # Regra default = envia tudo para o controlador
         match = parser.OFPMatch()
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
                                           ofproto.OFPCML_NO_BUFFER)]
@@ -43,11 +43,15 @@ class SimpleSwitch13(app_manager.OSKenApp):
         parser = datapath.ofproto_parser
         in_port = msg.match['in_port']
 
-        # Decodifica pacote corretamente
+        # Decodifica o pacote
         pkt = packet.Packet(msg.data)
         eth = pkt.get_protocol(ethernet.ethernet)
 
         if eth is None:
+            return
+
+        # Ignorar LLDP
+        if eth.ethertype == 35020:
             return
 
         dst = eth.dst
@@ -56,18 +60,19 @@ class SimpleSwitch13(app_manager.OSKenApp):
         dpid = datapath.id
         self.mac_to_port.setdefault(dpid, {})
 
-        # Aprende MAC
+        # Aprender a porta da origem
         self.mac_to_port[dpid][src] = in_port
 
-        # Escolhe porta de saída
+        # Se souber o destino -> encaminha direto
         if dst in self.mac_to_port[dpid]:
             out_port = self.mac_to_port[dpid][dst]
         else:
+            # Senão -> FLOOD
             out_port = ofproto.OFPP_FLOOD
 
         actions = [parser.OFPActionOutput(out_port)]
 
-        # Instala fluxo se souber destino
+        # Instalar fluxo quando souber destino
         if out_port != ofproto.OFPP_FLOOD:
             match = parser.OFPMatch(
                 in_port=in_port,
@@ -76,12 +81,12 @@ class SimpleSwitch13(app_manager.OSKenApp):
             )
             self.add_flow(datapath, 1, match, actions)
 
-        # Envia pacote
+        # Agora envia o pacote de volta ao switch
         out = parser.OFPPacketOut(
             datapath=datapath,
             buffer_id=msg.buffer_id,
             in_port=in_port,
             actions=actions,
-            data=msg.data
+            data=msg.data if msg.buffer_id == ofproto.OFP_NO_BUFFER else None
         )
         datapath.send_msg(out)

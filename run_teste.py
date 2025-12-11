@@ -97,7 +97,8 @@ def run():
     time.sleep(2)  # Tempo para o controlador subir
 
     info("\n=== Criando topologia RNP no Mininet ===\n")
-    topo = RNPTopo()
+    #topo = RNPTopo()
+    topo = TreeTopo(depth=2, fanout=2)
     net = Mininet(topo=topo,
                   controller=None,
                   autoSetMacs=True,
