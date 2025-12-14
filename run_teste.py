@@ -9,6 +9,9 @@ from mininet.topolib import TreeTopo
 from mininet.link import TCLink
 from mininet.cli import CLI
 from topo_rnp import RNPTopo
+from mininet.node import OVSSwitch
+from functools import partial
+
 
 
 
@@ -60,10 +63,8 @@ def test_throughput(net):
                 src = hosts[i]
                 dst = hosts[j]
 
-                # Iniciar servidor TCP
-                dst.cmd("iperf3 -s -D")  # Daemon
-
-                # Cliente envia tráfego por 5 segundos
+                dst.cmd("iperf3 -s -1 > /tmp/iperf3_server.log 2>&1 &")
+                time.sleep(0.2)  # tempo para o servidor levantar
                 output = src.cmd(f"iperf3 -c {dst.IP()} -J -t 5")
 
                 # Extrair vazão
@@ -78,7 +79,7 @@ def test_throughput(net):
                 results.append([src.name, dst.name, bitrate])
                 info(f"{src.name} -> {dst.name}: {bitrate} Mbps\n")
 
-                dst.cmd("killall iperf3")
+               
 
     return results
 
@@ -90,50 +91,70 @@ def run():
     setLogLevel('info')
 
     info("\n=== Iniciando controlador OS-Ken ===\n")
-    controller = subprocess.Popen(RYU_CMD.split(),
-                                  stdout=subprocess.PIPE,
-                                  stderr=subprocess.PIPE)
+    logf = open("osken.log", "w")
+    controller = subprocess.Popen(RYU_CMD.split(), stdout=logf, stderr=logf)
 
-    time.sleep(2)  # Tempo para o controlador subir
+    net = None
+    try:
+        time.sleep(2)  # Tempo para o controlador subir
 
-    info("\n=== Criando topologia RNP no Mininet ===\n")
-    #topo = RNPTopo()
-    topo = TreeTopo(depth=2, fanout=2)
-    net = Mininet(topo=topo,
-                  controller=None,
-                  autoSetMacs=True,
-                  link=TCLink)
+        info("\n=== Criando topologia RNP no Mininet ===\n")
+        topo = RNPTopo()
 
-    net.addController("c0", controller=RemoteController,
-                      ip="127.0.0.1", port=RYU_PORT)
+        net = Mininet(
+            topo=topo,
+            controller=None,
+            autoSetMacs=True,
+            link=TCLink
+        )
 
-    net.start()
+        net.addController(
+            "c0",
+            controller=RemoteController,
+            ip="127.0.0.1",
+            port=RYU_PORT
+        )
 
-    info("\n=== Aquecendo a rede com pingAll ===\n")
-    net.pingAll()
+        net.start()
+        # reduzir o tempo de convergência do STP no OVS
+        for sw in net.switches:
+            sw.cmd(f"ovs-vsctl set Bridge {sw.name} other_config:stp-forward-delay=4")
+            sw.cmd(f"ovs-vsctl set Bridge {sw.name} other_config:stp-max-age=6")
+        time.sleep(35)  # STP convergir + switches conectarem no controlador
 
-    # ---- Testes ----
-    latency_results = test_latency(net)
-    throughput_results = test_throughput(net)
+        info(f"Switches: {[s.name for s in net.switches]}\n")
+        info(f"Hosts: {[h.name for h in net.hosts]}\n")
 
-    # ---- Salvando CSV ----
-    info("\n=== Salvando resultados ===\n")
+        info("\n=== Aquecendo a rede com pingAll ===\n")
+        net.pingAll()
 
-    with open("latencia.csv", "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["Origem", "Destino", "Latência Média (ms)"])
-        writer.writerows(latency_results)
+        # ---- Testes ----
+        latency_results = test_latency(net)
+        throughput_results = test_throughput(net)
 
-    with open("vazao.csv", "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["Origem", "Destino", "Vazão TCP (Mbps)"])
-        writer.writerows(throughput_results)
+        # ---- Salvando CSV ----
+        info("\n=== Salvando resultados ===\n")
 
-    info("\nArquivos gerados: latencia.csv, vazao.csv\n")
+        with open("latencia.csv", "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["Origem", "Destino", "Latência Média (ms)"])
+            writer.writerows(latency_results)
 
-    CLI(net)
-    net.stop()
-    controller.terminate()
+        with open("vazao.csv", "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["Origem", "Destino", "Vazão TCP (Mbps)"])
+            writer.writerows(throughput_results)
+
+        info("\nArquivos gerados: latencia.csv, vazao.csv\n")
+
+        CLI(net)  # Se quiser execução 100% automática, comente esta linha.
+
+    finally:
+        if net is not None:
+            net.stop()
+        controller.terminate()
+        logf.close()
+
 def gerar_notebook():
     import json
 
