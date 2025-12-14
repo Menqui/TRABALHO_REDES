@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import subprocess
 import time
 import csv
@@ -155,108 +154,8 @@ def run():
         controller.terminate()
         logf.close()
 
-def gerar_notebook():
-    import json
-
-    notebook = {
-        "cells": [
-            {
-                "cell_type": "markdown",
-                "metadata": {},
-                "source": [
-                    "# 📊 Análise de Resultados – SDN\n",
-                    "Notebook gerado automaticamente pelo script."
-                ]
-            },
-            {
-                "cell_type": "code",
-                "metadata": {},
-                "source": [
-                    "import pandas as pd\n",
-                    "import matplotlib.pyplot as plt\n",
-                    "\n",
-                    "lat = pd.read_csv('latencia.csv')\n",
-                    "vaz = pd.read_csv('vazao.csv')\n",
-                    "\n",
-                    "# Criar coluna 'host_pair'\n",
-                    "lat['host_pair'] = lat['Origem'] + '-' + lat['Destino']\n",
-                    "vaz['host_pair'] = vaz['Origem'] + '-' + vaz['Destino']\n",
-                    "\n",
-                    "# Converter valores numéricos (N/A vira NaN)\n",
-                    "lat['Latência Média (ms)'] = pd.to_numeric(lat['Latência Média (ms)'], errors='coerce')\n",
-                    "vaz['Vazão TCP (Mbps)'] = pd.to_numeric(vaz['Vazão TCP (Mbps)'], errors='coerce')\n",
-                    "\n",
-                    "lat.head(), vaz.head()"
-                ]
-            },
-            {
-                "cell_type": "code",
-                "metadata": {},
-                "source": [
-                    "# 📈 Gráfico de Latência\n",
-                    "plt.figure()\n",
-                    "plt.plot(lat['host_pair'], lat['Latência Média (ms)'])\n",
-                    "plt.xlabel('Par de Hosts')\n",
-                    "plt.ylabel('Latência (ms)')\n",
-                    "plt.title('Latência por Par de Hosts')\n",
-                    "plt.xticks(rotation=90)\n",
-                    "plt.tight_layout()\n",
-                    "plt.show()"
-                ]
-            },
-            {
-                "cell_type": "code",
-                "metadata": {},
-                "source": [
-                    "# 📈 Gráfico de Vazão\n",
-                    "plt.figure()\n",
-                    "plt.plot(vaz['host_pair'], vaz['Vazão TCP (Mbps)'])\n",
-                    "plt.xlabel('Par de Hosts')\n",
-                    "plt.ylabel('Vazão TCP (Mbps)')\n",
-                    "plt.title('Vazão TCP por Par de Hosts')\n",
-                    "plt.xticks(rotation=90)\n",
-                    "plt.tight_layout()\n",
-                    "plt.show()"
-                ]
-            },
-            {
-                "cell_type": "code",
-                "metadata": {},
-                "source": [
-                    "# 📉 Comparação Latência x Vazão\n",
-                    "plt.figure()\n",
-                    "plt.plot(lat['host_pair'], lat['Latência Média (ms)'], label='Latência (ms)')\n",
-                    "plt.plot(vaz['host_pair'], vaz['Vazão TCP (Mbps)'], label='Vazão TCP (Mbps)')\n",
-                    "plt.legend()\n",
-                    "plt.title('Comparativo Latência x Vazão')\n",
-                    "plt.xticks(rotation=90)\n",
-                    "plt.tight_layout()\n",
-                    "plt.show()"
-                ]
-            }
-        ],
-        "metadata": {
-            "kernelspec": {
-                "display_name": "Python 3",
-                "language": "python",
-                "name": "python3"
-            },
-            "language_info": {
-                "name": "python",
-                "version": "3.x"
-            }
-        },
-        "nbformat": 4,
-        "nbformat_minor": 5
-    }
-
-    with open("analise_resultados.ipynb", "w") as f:
-        json.dump(notebook, f, indent=2)
-
-    print("*** Notebook analise_resultados.ipynb criado com sucesso! ***")
 # ------------------------------------------------------------
 # Execução
 # ------------------------------------------------------------
 if __name__ == "__main__":
     run()
-    gerar_notebook()

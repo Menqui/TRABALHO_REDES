@@ -3,3 +3,19 @@ loading app osken_controller.py
 loading app os_ken.controller.ofp_handler
 instantiating app osken_controller.py of SimpleSwitch13
 instantiating app os_ken.controller.ofp_handler of OFPHandler
+hub: uncaught exception: Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/os_ken/lib/hub.py", line 69, in _launch
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/os_ken/controller/controller.py", line 153, in __call__
+    self.server_loop(self.ofp_tcp_listen_port,
+  File "/usr/lib/python3/dist-packages/os_ken/controller/controller.py", line 193, in server_loop
+    server = StreamServer((CONF.ofp_listen_host,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/os_ken/lib/hub.py", line 136, in __init__
+    self.server = eventlet.listen(listen_info)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/eventlet/convenience.py", line 78, in listen
+    sock.bind(addr)
+OSError: [Errno 98] Address already in use
+

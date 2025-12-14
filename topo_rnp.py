@@ -40,8 +40,6 @@ class RNPTopo(Topo):
         # Brasília -> Fortaleza
         self.addLink(sps[3], sps[5], bw=200, delay='20ms')
 
-        # Curitiba -> Fortaleza (backup)  # desativado para evitar loop L2
-        # self.addLink(sps[4], sps[5], bw=150, delay='25ms')
 
      
 

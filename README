@@ -1,3 +1,6 @@
+#Criar o Ambiente Virtual
+-- python3 -m venv venv
+
 # Ativar o Ambiente Virtual
 -- source venv/bin/activate
 
